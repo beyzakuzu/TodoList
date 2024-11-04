@@ -7,6 +7,7 @@ using System.Reflection;
 using TodoList.Service.Absracts;
 using TodoList.Service.Concretes;
 using TodoList.Service.Profiles;
+using TodoList.Service.Rules;
 
 
 namespace SweetDictionary.Service;
@@ -17,7 +18,8 @@ public static class ServiceDependencies
     public static IServiceCollection AddServiceDependencies(this IServiceCollection services)
     {
         services.AddAutoMapper(typeof(MappingProfiles));
-
+        services.AddScoped<CategoryBusinessRules>();
+        services.AddScoped<TodoBusinessRules>();
         services.AddScoped<IJwtService, JwtService>();
         services.AddScoped<IAuthenticationService, AuthenticationService>();
         services.AddScoped<IUserService, UserService>();

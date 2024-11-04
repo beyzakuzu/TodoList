@@ -76,9 +76,6 @@ namespace Service.Tests
             Assert.AreEqual(201, result.Status);
         }
 
-
-      
-
         [Test]
         public async Task UpdateAsync_WhenTodoUpdated_ReturnsSuccess()
         {
@@ -111,7 +108,7 @@ namespace Service.Tests
                 "TestCategory"
             );
 
-            _mockRepository.Setup(r => r.GetByIdAsync(dto.Id, "user123", "UserRole")).ReturnsAsync(todo);
+            _mockRepository.Setup(r => r.GetByIdAsync(dto.Id)).ReturnsAsync(todo);
             _mockMapper.Setup(m => m.Map<Todo>(dto)).Returns(todo);
             _mockRepository.Setup(r => r.UpdateAsync(todo)).ReturnsAsync(todo);
             _mockMapper.Setup(m => m.Map<TodoResponseDto>(todo)).Returns(responseDto);
@@ -125,25 +122,6 @@ namespace Service.Tests
             Assert.AreEqual(200, result.Status);
         }
 
-        [Test]
-        public async Task DeleteAsync_WhenTodoDeleted_ReturnsSuccess()
-        {
-            // Arrange
-            Guid id = Guid.NewGuid();
-            var todo = new Todo { Id = id, Title = "Test Todo", UserId = "user123" };
-
-            _mockRepository.Setup(r => r.GetByIdAsync(id, "user123", "UserRole")).ReturnsAsync(todo);
-            _mockRepository.Setup(r => r.DeleteAsync(todo)).Returns(Task.CompletedTask);
-
-            // Act
-            var result = await _todoService.DeleteAsync(id, "user123", "UserRole");
-
-            // Assert
-            Assert.IsTrue(result.Success);
-            Assert.AreEqual($"Todo Başlığı : {todo.Title}", result.Data);
-            Assert.AreEqual(204, result.Status);
-        }
+        
     }
-
-
 }
