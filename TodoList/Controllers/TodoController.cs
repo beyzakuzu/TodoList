@@ -1,110 +1,80 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using Core.Tokens.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using TodoList.Modelss.Dtos.Todos.Requests;
 using TodoList.Modelss.Entities;
+using TodoList.Service.Absracts;
 using static TodoList.Service.Absracts.ITodoService;
 [Route("api/[controller]")]
 [ApiController]
 public class TodoController : ControllerBase
 {
     private readonly ITodoService _todoService;
+    private readonly DecoderService _decoderService;
 
-    public TodoController(ITodoService todoService)
+    public TodoController(ITodoService todoService, DecoderService decoderService)
     {
         _todoService = todoService;
-    }
-
-    [HttpGet("getall")]
-    [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> GetAll()
-    {
-        
-        string userId = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
-        string userRole = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Role)?.Value;
-        var result = await _todoService.GetAllAsync(userId, userRole);
-
-        return Ok(result);
+        _decoderService = decoderService;
     }
 
     [HttpPost("add")]
-    [Authorize] 
-    public async Task<IActionResult> Add([FromBody] CreateTodoRequest dto)
+    public async Task<IActionResult> AddAsync([FromBody] CreateTodoRequest dto)
     {
-        string userId = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
-        var result = await _todoService.AddAsync(dto, userId);
-        return CreatedAtAction(nameof(GetById), new { id = result.Data.Id }, result);
-    }
-
-    [HttpGet("getbyid/{id}")]
-    [Authorize] 
-    public async Task<IActionResult> GetById(Guid id)
-    {
-        string userId = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
-        string userRole = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Role)?.Value; 
-        var result = await _todoService.GetByIdAsync(id, userId, userRole);
-        return Ok(result);
+        var result = await _todoService.AddAsync(dto);
+        return StatusCode(result.Status, result);
     }
 
     [HttpPut("update")]
-    [Authorize] 
-    public async Task<IActionResult> Update([FromBody] UpdateTodoRequest dto)
+    public async Task<IActionResult> UpdateAsync([FromBody] UpdateTodoRequest dto)
     {
-        string userId = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
-        string userRole = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Role)?.Value; 
-        var result = await _todoService.UpdateAsync(dto, userId, userRole);
+        var result = await _todoService.UpdateAsync(dto);
+        return StatusCode(result.Status, result);
+    }
+
+    [HttpDelete("delete")]
+    public async Task<IActionResult> DeleteAsync([FromQuery] Guid id)
+    {
+        var result = await _todoService.DeleteAsync(id);
+        return StatusCode(result.Status, result);
+    }
+
+    [HttpGet("getbyid")]
+    public async Task<IActionResult> GetByIdAsync([FromQuery] Guid id)
+    {
+        var result = await _todoService.GetByIdAsync(id);
         return Ok(result);
     }
 
-    [HttpDelete("delete/{id}")]
-    [Authorize] 
-    public async Task<IActionResult> Delete(Guid id)
+    [HttpGet("getallbypriority")]
+    public async Task<IActionResult> GetAllByPriorityAsync([FromQuery] Priority priority)
     {
-        string userId = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
-        string userRole = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Role)?.Value; 
-        var result = await _todoService.DeleteAsync(id, userId, userRole);
-        return NoContent();
-    }
-
-    [HttpGet("getallbycategoryid/{categoryId}")]
-    [Authorize]
-    public async Task<IActionResult> GetAllByCategoryId(int categoryId)
-    {
-        string userId = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
-        string userRole = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Role)?.Value;
-
-        var result = await _todoService.GetAllByCategoryIdAsync(categoryId, userId, userRole);
-
+        var result = await _todoService.GetAllByPriorityAsync(priority);
         return Ok(result);
     }
 
-    [HttpGet("getallbyuserid/{userId}")]
-    [Authorize] 
-    public async Task<IActionResult> GetAllByUserId(string userId)
+    [HttpGet("getallbystartdaterange")]
+    public async Task<IActionResult> GetAllByStartDateRangeAsync([FromQuery] DateTime startDate, [FromQuery] DateTime endDate)
     {
-        string requesterId = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value; 
-        string userRole = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Role)?.Value; 
-        var result = await _todoService.GetAllByUserIdAsync(userId, requesterId, userRole);
+        var result = await _todoService.GetAllByStartDateRangeAsync(startDate, endDate);
         return Ok(result);
     }
 
-    [HttpGet("getallbypriority/{priority}")]
-    [Authorize] 
-    public async Task<IActionResult> GetAllByPriority(Priority priority)
+ 
+    [HttpGet("owntodos")]
+    public async Task<IActionResult> OwnTodos()
     {
-        string userId = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
-        string userRole = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Role)?.Value; 
-        var result = await _todoService.GetAllByPriorityAsync(priority, userId, userRole);
-        return Ok(result);
+        var userId = _decoderService.GetUserId();
+        var result = await _todoService.GetAllByUserIdAsync(userId); 
+        return Ok(result); 
     }
 
-    [HttpGet("getallbydaterange")]
-    [Authorize] 
-    public async Task<IActionResult> GetAllByDateRange(DateTime startDate, DateTime endDate)
+    [HttpDelete("deleteexpired")]
+    public async Task<IActionResult> DeleteExpiredTodosAsync()
     {
-        string userId = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.NameIdentifier)?.Value;
-        string userRole = HttpContext.User.Claims.FirstOrDefault(x => x.Type == ClaimTypes.Role)?.Value; 
-        var result = await _todoService.GetAllByDateRangeAsync(startDate, endDate, userId, userRole);
-        return Ok(result);
+        var result = await _todoService.DeleteExpiredTodosAsync();
+        return StatusCode(result.Status, result);
     }
 }
+

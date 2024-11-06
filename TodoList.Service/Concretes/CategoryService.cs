@@ -19,7 +19,7 @@ namespace TodoList.Service.Concretes
     {
         private readonly ICategoryRepository _categoryRepository;
         private readonly CategoryBusinessRules _businessRules;
-        private ICategoryRepository @object;
+        private ICategoryRepository _repo;
 
         public CategoryService(ICategoryRepository categoryRepository, CategoryBusinessRules businessRules)
         {
@@ -27,9 +27,9 @@ namespace TodoList.Service.Concretes
             _businessRules = businessRules;
         }
 
-        public CategoryService(ICategoryRepository @object)
+        public CategoryService(ICategoryRepository _repo)
         {
-            this.@object = @object;
+            this._repo = _repo;
         }
 
         public async Task<ReturnModel<CategoryResponseDto>> AddAsync(CreateCategoryRequest dto)

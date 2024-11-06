@@ -13,115 +13,190 @@ using TodoList.Modelss.Entities;
 using TodoList.Modelss.Dtos.Todos.Responses;
 using Core.Exceptions;
 using System.Linq.Expressions;
+using TodoList.Service.Constants;
+using Core.Responses;
 
 namespace Service.Tests
 {
+    [TestFixture]
     public class TodoServiceTest
     {
         private TodoService _todoService;
-        private Mock<ITodoRepository> _mockRepository;
+        private Mock<ITodoRepository> _repositoryMock;
         private Mock<IMapper> _mockMapper;
-        private Mock<TodoBusinessRules> _mockBusinessRules;
+        private Mock<TodoBusinessRules> _rulesMock;
 
         [SetUp]
         public void SetUp()
         {
-            _mockRepository = new Mock<ITodoRepository>();
+            _repositoryMock = new Mock<ITodoRepository>();
             _mockMapper = new Mock<IMapper>();
-            _mockBusinessRules = new Mock<TodoBusinessRules>();
-            _todoService = new TodoService(_mockRepository.Object, _mockMapper.Object, _mockBusinessRules.Object);
+            _rulesMock = new Mock<TodoBusinessRules>();
+            _todoService = new TodoService(_repositoryMock.Object, _mockMapper.Object, _rulesMock.Object);
         }
 
         [Test]
-        public async Task AddAsync_WhenTodoAdded_ReturnsSuccess()
+        public async Task Add_WhenTodoAdded_ReturnsSuccess()
         {
             // Arrange
-            CreateTodoRequest dto = new CreateTodoRequest("Test Todo", "Description", DateTime.Now, DateTime.Now.AddDays(1), Priority.Normal, 1);
-            Todo createdTodo = new Todo
+            var dto = new CreateTodoRequest("Test Todo", "Description", DateTime.Now.AddDays(1), DateTime.Now.AddDays(2), Priority.High, 1);
+            var todo = new Todo
             {
                 Id = Guid.NewGuid(),
+                Title = "Test Todo",
+                Description = "Description",
+                StartDate = DateTime.Now.AddDays(1),
+                EndDate = DateTime.Now.AddDays(2),
+                Priority = Priority.High,
+                CategoryId = 1,
+                CreatedDate = DateTime.Now
+            };
+            var response = new TodoResponseDto(
+                todo.Id,
+                todo.Title,
+                todo.Description,
+                todo.StartDate,
+                todo.EndDate,
+                todo.CreatedDate,
+                todo.Priority,
+                todo.CategoryId,
+                false, // Completed
+                "Test User",
+                "userId",
+                "General"
+            );
+
+            _mockMapper.Setup(x => x.Map<Todo>(dto)).Returns(todo);
+            _mockMapper.Setup(x => x.Map<TodoResponseDto>(It.IsAny<Todo>())).Returns(response);
+            _mockMapper.Setup(x => x.Map<TodoResponseDto>(todo)).Returns(response);
+
+            // Act
+            var result = await _todoService.AddAsync(dto);
+
+            // Assert
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(201, result.Status);
+            Assert.AreEqual(Messages.TodoAddedMessage, result.Message);
+        }
+
+        [Test]
+        public async Task Update_WhenTodoUpdated_ReturnsSuccess()
+        {
+            // Arrange
+            var dto = new UpdateTodoRequest(
+                Guid.NewGuid(),
+                "Updated Todo",
+                "Updated Description",
+                DateTime.Now.AddDays(1),
+                DateTime.Now.AddDays(2),
+                Priority.Normal,
+                2,
+                false);
+            var existingTodo = new Todo
+            {
+                Id = dto.Id,
+                Title = "Old Todo",
+                Description = "Old Description",
+                StartDate = DateTime.Now.AddDays(1),
+                EndDate = DateTime.Now.AddDays(2),
+                Priority = Priority.Low,
+                CategoryId = 1,
+                CreatedDate = DateTime.Now
+            };
+            var updatedTodo = new Todo
+            {
+                Id = dto.Id,
                 Title = dto.Title,
                 Description = dto.Description,
                 StartDate = dto.StartDate,
                 EndDate = dto.EndDate,
                 Priority = dto.Priority,
                 CategoryId = dto.CategoryId,
-                UserId = "user123"
+                CreatedDate = existingTodo.CreatedDate
             };
-            TodoResponseDto responseDto = new TodoResponseDto(
-                createdTodo.Id,
-                createdTodo.Title,
-                createdTodo.Description,
-                createdTodo.StartDate,
-                createdTodo.EndDate,
-                DateTime.Now,
-                createdTodo.Priority,
-                createdTodo.CategoryId,
-                false,
-                "TestUser",
-                createdTodo.UserId,
-                "TestCategory"
+            var response = new TodoResponseDto(
+                updatedTodo.Id,
+                updatedTodo.Title,
+                updatedTodo.Description,
+                updatedTodo.StartDate,
+                updatedTodo.EndDate,
+                updatedTodo.CreatedDate,
+                updatedTodo.Priority,
+                updatedTodo.CategoryId,
+                false, // Completed
+                "Test User",
+                "userId",
+                "General"
             );
 
-            _mockMapper.Setup(m => m.Map<Todo>(dto)).Returns(createdTodo);
-            _mockRepository.Setup(r => r.AddAsync(createdTodo)).ReturnsAsync(createdTodo);
-            _mockMapper.Setup(m => m.Map<TodoResponseDto>(createdTodo)).Returns(responseDto);
+            _repositoryMock.Setup(x => x.GetByIdAsync(dto.Id)).ReturnsAsync(existingTodo);
+            _mockMapper.Setup(x => x.Map(dto, existingTodo));
+            _mockMapper.Setup(x => x.Map<TodoResponseDto>(existingTodo)).Returns(response);
 
             // Act
-            var result = await _todoService.AddAsync(dto, "user123");
+            var result = await _todoService.UpdateAsync(dto);
 
             // Assert
             Assert.IsTrue(result.Success);
-            Assert.AreEqual(responseDto, result.Data);
-            Assert.AreEqual(201, result.Status);
+            Assert.AreEqual(200, result.Status);
+            Assert.AreEqual(Messages.TodoUpdatedMessage, result.Message);
         }
 
         [Test]
-        public async Task UpdateAsync_WhenTodoUpdated_ReturnsSuccess()
+        public async Task GetById_WhenTodoNotFound_ThrowsNotFoundException()
         {
             // Arrange
-            UpdateTodoRequest dto = new UpdateTodoRequest(Guid.NewGuid(), "Updated Todo", "Updated Description", DateTime.Now, DateTime.Now.AddDays(2), Priority.Low, 1, true);
+            var todoId = Guid.NewGuid();
+            Todo todo = null;
+            _rulesMock.Setup(x => x.TodoIsNullCheck(todo)).Throws(new NotFoundException("Todo not found"));
+
+            // Assert
+            var exception = Assert.ThrowsAsync<NotFoundException>(() => _todoService.GetByIdAsync(todoId));
+            Assert.AreEqual("Todo not found", exception.Message);
+        }
+
+        [Test]
+        public async Task GetById_WhenTodoFound_ReturnsSuccess()
+        {
+            // Arrange
+            var todoId = Guid.NewGuid();
             var todo = new Todo
             {
-                Id = dto.Id,
-                Title = "Old Todo",
-                Description = "Old Description",
-                StartDate = DateTime.Now,
-                EndDate = DateTime.Now.AddDays(1),
+                Id = todoId,
+                Title = "Test Todo",
+                Description = "Description",
+                StartDate = DateTime.Now.AddDays(1),
+                EndDate = DateTime.Now.AddDays(2),
                 Priority = Priority.Normal,
                 CategoryId = 1,
-                Completed = false,
-                UserId = "user123"
+                CreatedDate = DateTime.Now
             };
-            var responseDto = new TodoResponseDto(
-                dto.Id,
-                dto.Title,
-                dto.Description,
-                dto.StartDate,
-                dto.EndDate,
-                DateTime.Now,
-                dto.Priority,
-                dto.CategoryId,
-                dto.Completed,
-                "TestUser",
-                todo.UserId,
-                "TestCategory"
+            var response = new TodoResponseDto(
+                todo.Id,
+                todo.Title,
+                todo.Description,
+                todo.StartDate,
+                todo.EndDate,
+                todo.CreatedDate,
+                todo.Priority,
+                todo.CategoryId,
+                false, // Completed
+                "Test User",
+                "userId",
+                "General"
             );
 
-            _mockRepository.Setup(r => r.GetByIdAsync(dto.Id)).ReturnsAsync(todo);
-            _mockMapper.Setup(m => m.Map<Todo>(dto)).Returns(todo);
-            _mockRepository.Setup(r => r.UpdateAsync(todo)).ReturnsAsync(todo);
-            _mockMapper.Setup(m => m.Map<TodoResponseDto>(todo)).Returns(responseDto);
+            _repositoryMock.Setup(x => x.GetByIdAsync(todoId)).ReturnsAsync(todo);
+            _rulesMock.Setup(x => x.TodoIsNullCheck(todo));
+            _mockMapper.Setup(x => x.Map<TodoResponseDto>(todo)).Returns(response);
 
             // Act
-            var result = await _todoService.UpdateAsync(dto, "user123", "UserRole");
+            var result = await _todoService.GetByIdAsync(todoId);
 
             // Assert
             Assert.IsTrue(result.Success);
-            Assert.AreEqual(responseDto, result.Data);
             Assert.AreEqual(200, result.Status);
+            Assert.AreEqual(response, result.Data);
         }
-
-        
     }
 }
